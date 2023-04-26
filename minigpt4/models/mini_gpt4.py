@@ -166,17 +166,18 @@ class MiniGPT4(Blip2Base):
     def forward(self, samples):
         image = samples["image"]
         img_embeds, atts_img = self.encode_img(image)
-        if hasattr(samples, 'question_split'):  # VQA dataset
-            print('VQA Batch')
-            vqa_prompt = '###Human: <Img><ImageHere></Img> '
-            img_embeds, atts_img = self.prompt_wrap(img_embeds, atts_img, vqa_prompt)
-        elif self.prompt_list:
-            prompt = random.choice(self.prompt_list)
-            img_embeds, atts_img = self.prompt_wrap(img_embeds, atts_img, prompt)
-
+        concat_img_embeds, concat_atts_img = [], []
+        for i in range(len(samples['instruction'])):
+            prompt = '###Human: <Img><ImageHere></Img> ' + samples['instruction'][i] + ' ###Assistant: '
+            img_embed, att_img = self.prompt_wrap(img_embeds[i].unsqueeze(0), atts_img[i].unsqueeze(0), prompt)
+            concat_img_embeds.append(img_embed)
+            concat_atts_img.append(att_img)
+        img_embeds = torch.cat(concat_img_embeds, dim=0)
+        atts_img = torch.cat(concat_atts_img, dim=0)
+        
         self.llama_tokenizer.padding_side = "right"
 
-        text = [t + self.end_sym for t in samples["text_input"]]
+        text = [t + self.end_sym for t in samples["text_input"]]         # text_input is the target caption
 
         to_regress_tokens = self.llama_tokenizer(
             text,

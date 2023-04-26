@@ -7,11 +7,19 @@ model:
   end_sym: "###"
   prompt_path: "prompts/alignment.txt"
   prompt_template: '###Human: {} ###Assistant: '
-  ckpt: '/path/to/stage1/checkpoint/'
+  ckpt: '/home/hadoop-ba-dealrank/dolphinfs_hdd_hadoop-ba-dealrank/duyifan04/MiniGPT-4/ckpt/pretrained_minigpt4_stage1.pth'
 
 
 datasets:
   cc_sbu_align:
+    vis_processor:
+      train:
+        name: "blip2_image_train"
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+  coco_vqa:
     vis_processor:
       train:
         name: "blip2_image_train"
