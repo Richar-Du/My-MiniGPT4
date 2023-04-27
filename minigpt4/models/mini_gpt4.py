@@ -187,8 +187,8 @@ class MiniGPT4(Blip2Base):
             empty_len = before_tokens.input_ids.size()[1] + img_embeds.size()[1]  # after的在后面算
             empty_targets.append([-100] * (empty_len+1))  # plus one for bos
             # after_input_ids: instructions + answer
-            after_input_ids.append(after_tokens.input_ids.squeeze(0).tolist()+output_tokens.input_ids[i].tolist())
-            after_input_attentions.append(after_tokens.attention_mask.suqeeze(0).tolist()+output_tokens.attention_mask[i].tolist())
+            after_input_ids.append(after_tokens.input_ids.squeeze(0).tolist()+output_tokens.input_ids[i])
+            after_input_attentions.append(after_tokens.attention_mask.squeeze(0).tolist()+output_tokens.attention_mask[i])
         empty_targets = torch.tensor(empty_targets).to(img_embeds.device)
         after_input_ids = torch.nn.utils.rnn.pad_sequence(after_input_ids, batch_first=True, padding_value=2).to(img_embeds.device)
         after_input_attentions = torch.nn.utils.rnn.pad_sequence(after_input_attentions, batch_first=True, padding_value=0).to(img_embeds.device)
