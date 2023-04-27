@@ -166,48 +166,50 @@ class MiniGPT4(Blip2Base):
     def forward(self, samples):
         image = samples["image"]
         img_embeds, atts_img = self.encode_img(image)
-        concat_img_embeds, concat_atts_img = [], []
+        import ipdb
+        ipdb.set_trace()
+        self.llama_tokenizer.padding_side = "right"
+        text = [t + self.end_sym for t in samples["text_input"]]         # text_input is the target caption
+        empty_targets = []
+        output_tokens = self.llama_tokenizer(
+            text, return_tensors="pt", padding=True, truncation=True, max_length=self.max_txt_len,
+            add_special_tokens=False).to(img_embeds.device)             # tokens for the target caption (answer)
+        input_ids = []
+        input_attentions = []
         for i in range(len(samples['instruction'])):
             prompt = '###Human: <Img><ImageHere></Img> ' + samples['instruction'][i] + ' ###Assistant: '
-            img_embed, att_img = self.prompt_wrap(img_embeds[i].unsqueeze(0), atts_img[i].unsqueeze(0), prompt)
-            concat_img_embeds.append(img_embed)
-            concat_atts_img.append(att_img)
-        img_embeds = torch.cat(concat_img_embeds, dim=0)
-        atts_img = torch.cat(concat_atts_img, dim=0)
+            whole_sentence = prompt + text[i]
+            before, after = whole_sentence.split('<ImageHere>')
+            empty_len = before_tokens.size()[1]+ img_embeds.size()[1]   # after的在后面算
+            empty_targets.append(torch.tensor([-100] * empty_len+1, dtype=torch.long).to(img_embeds.device))  # plus one for bos
+            before_tokens = self.llama_tokenizer(
+                before, return_tensors="pt", add_special_tokens=False).to(img_embeds.device)
+            after_tokens = self.llama_tokenizer(
+                after, return_tensors="pt", add_special_tokens=False).to(img_embeds.device)
+            
+            input_ids.append(after_tokens.ids)
+            input_attentions.append(after_tokens.attention_mask)
+        after_input_ids = torch.nn.utils.rnn.pad_sequence(input_ids, batch_first=True, padding_value=2)
+        after_input_attentions = torch.nn.utils.rnn.pad_sequence(input_attentions, batch_first=True, padding_value=0)
+        after_input_embeds = self.llama_model.model.embed_tokens(after_input_ids)
+        before_input_attentions = before_tokens.attention_mask.expand(after_input_attentions[0], -1)
+        before_input_embeds = self.llama_model.model.embed_tokens(before_tokens.input_ids).expand(after_input_embeds.size()[0], -1, after_input_embeds.size()[-1])
+        inputs_embeds = torch.cat([before_input_embeds, img_embeds, after_input_embeds], dim=1)
+        inputs_attentions = torch.cat([before_input_attentions, atts_img, after_input_attentions], dim=1)
         
-        self.llama_tokenizer.padding_side = "right"
-
-        text = [t + self.end_sym for t in samples["text_input"]]         # text_input is the target caption
-
-        to_regress_tokens = self.llama_tokenizer(
-            text,
-            return_tensors="pt",
-            padding="longest",
-            truncation=True,
-            max_length=self.max_txt_len,
-            add_special_tokens=False
-        ).to(image.device)
-
-        targets = to_regress_tokens.input_ids.masked_fill(
-            to_regress_tokens.input_ids == self.llama_tokenizer.pad_token_id, -100
-        )
-
-        empty_targets = (
-            torch.ones([atts_img.shape[0], atts_img.shape[1]+1],
-                       dtype=torch.long).to(image.device).fill_(-100)  # plus one for bos
+        targets = after_input_attentions.masked_fill(
+            output_tokens.attention_mask == 0, -100
         )
         targets = torch.cat([empty_targets, targets], dim=1)
 
         batch_size = img_embeds.shape[0]
         bos = torch.ones([batch_size, 1],
-                         dtype=to_regress_tokens.input_ids.dtype,
-                         device=to_regress_tokens.input_ids.device) * self.llama_tokenizer.bos_token_id
+                         dtype=before_tokens.input_ids.dtype,
+                         device=before_tokens.input_ids.device) * self.llama_tokenizer.bos_token_id
         bos_embeds = self.llama_model.model.embed_tokens(bos)
         atts_bos = atts_img[:, :1]
-
-        to_regress_embeds = self.llama_model.model.embed_tokens(to_regress_tokens.input_ids)
-        inputs_embeds = torch.cat([bos_embeds, img_embeds, to_regress_embeds], dim=1)
-        attention_mask = torch.cat([atts_bos, atts_img, to_regress_tokens.attention_mask], dim=1)
+        inputs_embeds = torch.cat([bos_embeds, inputs_embeds], dim=1)
+        attention_mask = torch.cat([atts_bos, inputs_attentions], dim=1)
 
         with self.maybe_autocast():
             outputs = self.llama_model(
