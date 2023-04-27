@@ -54,8 +54,8 @@ class COCOVQADataset(VQADataset, __DisplMixin):
 
         return {
             "image": image,
-            "instruction": question,
-            "text_input": ann["answer"][0],
+            "question": question,
+            "answer": ann["answer"][0],
         }
 
 
