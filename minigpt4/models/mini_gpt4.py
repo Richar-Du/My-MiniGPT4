@@ -166,8 +166,6 @@ class MiniGPT4(Blip2Base):
     def forward(self, samples):
         image = samples["image"]
         img_embeds, atts_img = self.encode_img(image)
-        import ipdb
-        ipdb.set_trace()
         self.llama_tokenizer.padding_side = "right"
         text = [t + self.end_sym for t in samples["text_input"]]         # text_input is the target caption
         empty_targets = []
