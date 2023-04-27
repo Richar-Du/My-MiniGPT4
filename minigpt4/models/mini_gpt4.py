@@ -180,13 +180,12 @@ class MiniGPT4(Blip2Base):
             prompt = '###Human: <Img><ImageHere></Img> ' + samples['instruction'][i] + ' ###Assistant: '
             whole_sentence = prompt + text[i]
             before, after = whole_sentence.split('<ImageHere>')
-            empty_len = before_tokens.size()[1]+ img_embeds.size()[1]   # after的在后面算
-            empty_targets.append(torch.tensor([-100] * empty_len+1, dtype=torch.long).to(img_embeds.device))  # plus one for bos
             before_tokens = self.llama_tokenizer(
                 before, return_tensors="pt", add_special_tokens=False).to(img_embeds.device)
             after_tokens = self.llama_tokenizer(
                 after, return_tensors="pt", add_special_tokens=False).to(img_embeds.device)
-            
+            empty_len = before_tokens.size()[1]+ img_embeds.size()[1]   # after的在后面算
+            empty_targets.append(torch.tensor([-100] * empty_len+1, dtype=torch.long).to(img_embeds.device))  # plus one for bos
             input_ids.append(after_tokens.ids)
             input_attentions.append(after_tokens.attention_mask)
         after_input_ids = torch.nn.utils.rnn.pad_sequence(input_ids, batch_first=True, padding_value=2)
