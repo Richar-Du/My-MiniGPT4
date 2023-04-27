@@ -23,8 +23,6 @@ class VQADataset(BaseDataset):
             image_list.append(sample["image"])
             question_list.append(sample["text_input"])
 
-            weight_list.extend(sample["weights"])
-
             answers = sample["answers"]
 
             answer_list.extend(answers)
@@ -32,9 +30,8 @@ class VQADataset(BaseDataset):
 
         return {
             "image": torch.stack(image_list, dim=0),
-            "text_input": question_list,
-            "answer": answer_list,
-            "weight": torch.Tensor(weight_list),
+            "instruction": question_list,
+            "text_input": answer_list,
             "n_answers": torch.LongTensor(num_answers),
         }
 
