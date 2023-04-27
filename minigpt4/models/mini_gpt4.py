@@ -186,18 +186,19 @@ class MiniGPT4(Blip2Base):
                 after, return_tensors="pt", add_special_tokens=False).to(img_embeds.device)
             empty_len = before_tokens.input_ids.size()[1]+ img_embeds.size()[1]   # after的在后面算
             empty_targets.append([-100] * (empty_len+1))  # plus one for bos
-            input_ids.append(after_tokens.input_ids)
-            input_attentions.append(after_tokens.attention_mask)
+            input_ids.append(after_tokens.input_ids.squeeze(0))
+            input_attentions.append(after_tokens.attention_mask.suqeeze(0))
+        empty_targets = torch.tensor(empty_targets).to(img_embeds.device)
         after_input_ids = torch.nn.utils.rnn.pad_sequence(input_ids, batch_first=True, padding_value=2)
         after_input_attentions = torch.nn.utils.rnn.pad_sequence(input_attentions, batch_first=True, padding_value=0)
         after_input_embeds = self.llama_model.model.embed_tokens(after_input_ids)
-        before_input_attentions = before_tokens.attention_mask.expand(after_input_attentions[0], -1)
+        before_input_attentions = before_tokens.attention_mask.expand(after_input_attentions.size()[0], -1)
         before_input_embeds = self.llama_model.model.embed_tokens(before_tokens.input_ids).expand(after_input_embeds.size()[0], -1, after_input_embeds.size()[-1])
         inputs_embeds = torch.cat([before_input_embeds, img_embeds, after_input_embeds], dim=1)
         inputs_attentions = torch.cat([before_input_attentions, atts_img, after_input_attentions], dim=1)
         
-        targets = after_input_attentions.masked_fill(
-            output_tokens.attention_mask == 0, -100
+        targets = after_input_ids.masked_fill(
+            after_input_attentions == 0, -100
         )
         targets = torch.cat([empty_targets, targets], dim=1)
 
