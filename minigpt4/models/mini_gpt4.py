@@ -172,25 +172,26 @@ class MiniGPT4(Blip2Base):
         text = [t + self.end_sym for t in samples["text_input"]]         # text_input is the target caption
         empty_targets = []
         output_tokens = self.llama_tokenizer(
-            text, return_tensors="pt", padding=True, truncation=True, max_length=self.max_txt_len,
+            text, return_tensors="pt", padding=False, truncation=True, max_length=self.max_txt_len,
             add_special_tokens=False).to(img_embeds.device)             # tokens for the target caption (answer)
-        input_ids = []
-        input_attentions = []
+        after_input_ids = []
+        after_input_attentions = []
         for i in range(len(samples['instruction'])):
             prompt = '###Human: <Img><ImageHere></Img> ' + samples['instruction'][i] + ' ###Assistant: '
-            whole_sentence = prompt + text[i]
-            before, after = whole_sentence.split('<ImageHere>')
+            # whole_sentence = prompt + text[i]
+            before, after = prompt.split('<ImageHere>')
             before_tokens = self.llama_tokenizer(
                 before, return_tensors="pt", add_special_tokens=False).to(img_embeds.device)
             after_tokens = self.llama_tokenizer(
                 after, return_tensors="pt", add_special_tokens=False).to(img_embeds.device)
-            empty_len = before_tokens.input_ids.size()[1]+ img_embeds.size()[1]   # after的在后面算
+            empty_len = before_tokens.input_ids.size()[1] + img_embeds.size()[1]  # after的在后面算
             empty_targets.append([-100] * (empty_len+1))  # plus one for bos
-            input_ids.append(after_tokens.input_ids.squeeze(0))
-            input_attentions.append(after_tokens.attention_mask.suqeeze(0))
+            # after_input_ids: instructions + answer
+            after_input_ids.append(after_tokens.input_ids.squeeze(0).tolist()+output_tokens.input_ids[i].tolist())
+            after_input_attentions.append(after_tokens.attention_mask.suqeeze(0).tolist()+output_tokens.attention_mask[i].tolist())
         empty_targets = torch.tensor(empty_targets).to(img_embeds.device)
-        after_input_ids = torch.nn.utils.rnn.pad_sequence(input_ids, batch_first=True, padding_value=2)
-        after_input_attentions = torch.nn.utils.rnn.pad_sequence(input_attentions, batch_first=True, padding_value=0)
+        after_input_ids = torch.nn.utils.rnn.pad_sequence(after_input_ids, batch_first=True, padding_value=2)
+        after_input_attentions = torch.nn.utils.rnn.pad_sequence(after_input_attentions, batch_first=True, padding_value=0)
         after_input_embeds = self.llama_model.model.embed_tokens(after_input_ids)
         before_input_attentions = before_tokens.attention_mask.expand(after_input_attentions.size()[0], -1)
         before_input_embeds = self.llama_model.model.embed_tokens(before_tokens.input_ids).expand(after_input_embeds.size()[0], -1, after_input_embeds.size()[-1])
