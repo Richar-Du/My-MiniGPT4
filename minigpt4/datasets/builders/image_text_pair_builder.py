@@ -5,7 +5,7 @@ import warnings
 from minigpt4.common.registry import registry
 from minigpt4.datasets.builders.base_dataset_builder import BaseDatasetBuilder
 from minigpt4.datasets.datasets.laion_dataset import LaionDataset
-from minigpt4.datasets.datasets.cc_sbu_dataset import CCSBUDataset, CCSBUAlignDataset
+from minigpt4.datasets.datasets.cc_sbu_dataset import CCSBUDataset, CCSBUAlignDataset, LLaVACCSBUDataset
 
 
 @registry.register_builder("cc_sbu")
@@ -103,3 +103,11 @@ class CCSBUAlignBuilder(BaseDatasetBuilder):
         )
 
         return datasets
+
+@registry.register_builder("llava_ccsbu")
+class LLaVACCSBUBuiler(BaseDatasetBuilder):
+    train_dataset_cls = LLaVACCSBUDataset
+
+    DATASET_CONFIG_DICT = {
+        "default": "configs/datasets/cc_sbu/llava.yaml",
+    }

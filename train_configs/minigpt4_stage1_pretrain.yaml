@@ -6,16 +6,25 @@ model:
 
 
 datasets:
-  laion:
-    vis_processor:
-      train:
-        name: "blip2_image_train"
-        image_size: 224
-    text_processor:
-      train:
-        name: "blip_caption"
-    sample_ratio: 115
-  cc_sbu:
+  # laion:
+  #   vis_processor:
+  #     train:
+  #       name: "blip2_image_train"
+  #       image_size: 224
+  #   text_processor:
+  #     train:
+  #       name: "blip_caption"
+  #   sample_ratio: 115
+  # cc_sbu:
+  #   vis_processor:
+  #       train:
+  #         name: "blip2_image_train"
+  #         image_size: 224
+  #   text_processor:
+  #       train:
+  #         name: "blip_caption"
+  #   sample_ratio: 14
+  llava_ccsbu:
     vis_processor:
         train:
           name: "blip2_image_train"
@@ -23,7 +32,6 @@ datasets:
     text_processor:
         train:
           name: "blip_caption"
-    sample_ratio: 14
 
 
 run:

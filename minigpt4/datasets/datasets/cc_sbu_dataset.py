@@ -71,3 +71,32 @@ class CCSBUAlignDataset(CaptionDataset):
             "text_input": caption,
             "image_id": self.img_ids[ann["image_id"]],
         }
+    
+class LLaVACCSBUDataset(BaseDataset):
+    def __init(self, vis_processor, text_processor, vis_root, ann_paths):
+        self.vis_root = vis_root
+        self.annotation = json.load(open(data_path, "r"))[0]
+        self.zo = ZipFile(vis_root, 'r')
+
+        self.vis_processor = vis_processor
+        self.text_processor = text_processor
+
+        self._add_instance_ids()
+        
+    def __getitem__(self, index):
+        ann = self.annotation[index]
+        image_file = self.list_data_dict[i]['image']
+        image = Image.open(BytesIO(self.zo.read(image_file))).convert("RGB")
+        image = self.vis_processor(image)
+        instruction = ann['conversations'][0]['value']
+        instruction = ''.join(instruction.split('<image>')).strip()
+        caption = ann["conversations"][1]['value']
+        return {
+            "image": image,
+            "instruction": instruction,
+            "text_input": caption,
+            "image_id": ann['id']
+        }
+        
+        
+        
