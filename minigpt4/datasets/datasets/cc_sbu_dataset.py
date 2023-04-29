@@ -77,7 +77,9 @@ class CCSBUAlignDataset(CaptionDataset):
 class LLaVACCSBUDataset(BaseDataset):
     def __init__(self, vis_processor, text_processor, vis_root, ann_paths):
         self.vis_root = vis_root
-        self.annotation = json.load(open(ann_paths, "r"))[0]
+        self.annotation = []
+        for ann_path in ann_paths:
+            self.annotation.extend(json.load(open(ann_path, "r")))
         self.zo = ZipFile(vis_root, 'r')
 
         self.vis_processor = vis_processor
@@ -99,6 +101,3 @@ class LLaVACCSBUDataset(BaseDataset):
             "text_input": caption,
             "image_id": ann['id']
         }
-        
-        
-        
