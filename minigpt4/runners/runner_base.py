@@ -445,6 +445,8 @@ class RunnerBase:
             cuda_enabled=self.cuda_enabled,
             log_freq=self.log_freq,
             accum_grad_iters=self.accum_grad_iters,
+            config = self.config,
+            output_dir = self.output_dir,
         )
 
     @torch.no_grad()

@@ -110,6 +110,8 @@ class BaseTask:
         cuda_enabled=False,
         log_freq=50,
         accum_grad_iters=1,
+        config = None,
+        output_dir = None,
     ):
         return self._train_inner_loop(
             epoch=epoch,
@@ -122,6 +124,8 @@ class BaseTask:
             log_freq=log_freq,
             cuda_enabled=cuda_enabled,
             accum_grad_iters=accum_grad_iters,
+            config = config,
+            output_dir = output_dir,
         )
 
     def train_iters(
@@ -165,6 +169,8 @@ class BaseTask:
         log_freq=50,
         cuda_enabled=False,
         accum_grad_iters=1,
+        config = None,
+        output_dir = None,
     ):
         """
         An inner training loop compatible with both epoch-based and iter-based training.
@@ -237,7 +243,7 @@ class BaseTask:
             metric_logger.update(lr=optimizer.param_groups[0]["lr"])
             
             if (i + 1) % (log_freq * 20) == 0:
-                self._save_checkpoint(epoch, i)
+                self._save_checkpoint(model, optimizer, scaler, config, output_dir, epoch, i)
 
         # after train_epoch()
         # gather the stats from all processes
@@ -288,11 +294,11 @@ class BaseTask:
 
         return final_result_file
 
-    def _save_checkpoint(self, cur_epoch, cur_iter):
+    def _save_checkpoint(self, model, optimizer, scaler, config, output_dir, cur_epoch, cur_iter):
         """
         Save the checkpoint at the current epoch.
         """
-        model_no_ddp = self.unwrap_dist_model(self.model)
+        model_no_ddp = self.unwrap_dist_model(model, distributed=config.distributed)
         param_grad_dic = {
             k: v.requires_grad for (k, v) in model_no_ddp.named_parameters()
         }
@@ -303,21 +309,21 @@ class BaseTask:
                 del state_dict[k]
         save_obj = {
             "model": state_dict,
-            "optimizer": self.optimizer.state_dict(),
-            "config": self.config.to_dict(),
-            "scaler": self.scaler.state_dict() if self.scaler else None,
+            "optimizer": optimizer.state_dict(),
+            "config": config.to_dict(),
+            "scaler": scaler.state_dict() if scaler else None,
             "epoch": cur_epoch,
             "iter": cur_iter,
         }
         save_to = os.path.join(
-            self.output_dir,
+            output_dir,
             f"checkpoint_epoch{cur_epoch}_iter{cur_iter}.pth",
         )
         logging.info(f"Saving checkpoint at epoch {cur_epoch} iter {cur_iter} to {save_to}.")
         torch.save(save_obj, save_to)
         
-    def unwrap_dist_model(self, model):
-        if self.use_distributed:
+    def unwrap_dist_model(self, model, distributed):
+        if distributed:
             return model.module
         else:
             return model
