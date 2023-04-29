@@ -298,7 +298,7 @@ class BaseTask:
         """
         Save the checkpoint at the current epoch.
         """
-        model_no_ddp = self.unwrap_dist_model(model, distributed=config.distributed)
+        model_no_ddp = self.unwrap_dist_model(model, distributed=config.run_cfg.distributed)
         param_grad_dic = {
             k: v.requires_grad for (k, v) in model_no_ddp.named_parameters()
         }
