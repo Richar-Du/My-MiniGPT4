@@ -235,6 +235,9 @@ class BaseTask:
 
             metric_logger.update(loss=loss.item())
             metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+            
+            if (i + 1) % (log_freq * 20) == 0:
+                self._save_checkpoint(epoch, i)
 
         # after train_epoch()
         # gather the stats from all processes
@@ -284,3 +287,37 @@ class BaseTask:
             print("result file saved to %s" % final_result_file)
 
         return final_result_file
+
+    def _save_checkpoint(self, cur_epoch, cur_iter):
+        """
+        Save the checkpoint at the current epoch.
+        """
+        model_no_ddp = self.unwrap_dist_model(self.model)
+        param_grad_dic = {
+            k: v.requires_grad for (k, v) in model_no_ddp.named_parameters()
+        }
+        state_dict = model_no_ddp.state_dict()
+        for k in list(state_dict.keys()):
+            if k in param_grad_dic.keys() and not param_grad_dic[k]:
+                # delete parameters that do not require gradient
+                del state_dict[k]
+        save_obj = {
+            "model": state_dict,
+            "optimizer": self.optimizer.state_dict(),
+            "config": self.config.to_dict(),
+            "scaler": self.scaler.state_dict() if self.scaler else None,
+            "epoch": cur_epoch,
+            "iter": cur_iter,
+        }
+        save_to = os.path.join(
+            self.output_dir,
+            f"checkpoint_epoch{cur_epoch}_iter{cur_iter}.pth",
+        )
+        logging.info(f"Saving checkpoint at epoch {cur_epoch} iter {cur_iter} to {save_to}.")
+        torch.save(save_obj, save_to)
+        
+    def unwrap_dist_model(self, model):
+        if self.use_distributed:
+            return model.module
+        else:
+            return model
