@@ -1,6 +1,8 @@
 import os
 import json
 from PIL import Image
+from zipfile import ZipFile
+from io import BytesIO
 import webdataset as wds
 import random
 from minigpt4.datasets.datasets.base_dataset import BaseDataset
@@ -73,9 +75,9 @@ class CCSBUAlignDataset(CaptionDataset):
         }
     
 class LLaVACCSBUDataset(BaseDataset):
-    def __init(self, vis_processor, text_processor, vis_root, ann_paths):
+    def __init__(self, vis_processor, text_processor, vis_root, ann_paths):
         self.vis_root = vis_root
-        self.annotation = json.load(open(data_path, "r"))[0]
+        self.annotation = json.load(open(ann_paths, "r"))[0]
         self.zo = ZipFile(vis_root, 'r')
 
         self.vis_processor = vis_processor
@@ -85,7 +87,7 @@ class LLaVACCSBUDataset(BaseDataset):
         
     def __getitem__(self, index):
         ann = self.annotation[index]
-        image_file = self.list_data_dict[i]['image']
+        image_file = ann['image']
         image = Image.open(BytesIO(self.zo.read(image_file))).convert("RGB")
         image = self.vis_processor(image)
         instruction = ann['conversations'][0]['value']
