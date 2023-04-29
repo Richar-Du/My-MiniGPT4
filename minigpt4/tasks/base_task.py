@@ -242,7 +242,7 @@ class BaseTask:
             metric_logger.update(loss=loss.item())
             metric_logger.update(lr=optimizer.param_groups[0]["lr"])
             
-            if (i + 1) % (log_freq * 20) == 0:
+            if (i + 1) % (log_freq * 2) == 0:
                 self._save_checkpoint(model, optimizer, scaler, config, output_dir, epoch, i)
 
         # after train_epoch()
