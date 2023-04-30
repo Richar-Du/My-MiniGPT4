@@ -22,7 +22,7 @@ datasets:
               - https://storage.googleapis.com/sfr-vision-language-research/LAVIS/datasets/aokvqa/specialized_vocab_train.json
           storage:
               - aokvqa/annotations/aokvqa_v1p0_val.json
-              - aokvqa/annotations/specialized_vocab_train_lavis.json
+              - aokvqa/annotations/specialized_vocab_train.json
               # - aokvqa/annotations/large_vocab_train_lavis.json
         test:
           url:
@@ -30,6 +30,6 @@ datasets:
               - https://storage.googleapis.com/sfr-vision-language-research/LAVIS/datasets/aokvqa/specialized_vocab_train.json
           storage:
               - aokvqa/annotations/aokvqa_v1p0_test.json
-              - aokvqa/annotations/specialized_vocab_train_lavis.json
+              - aokvqa/annotations/specialized_vocab_train.json
       images:
-          storage: coco/images/
+          storage: /home/hadoop-ba-dealrank/dolphinfs_hdd_hadoop-ba-dealrank/duyifan04/instruct-vqa/cache/coco/images/
