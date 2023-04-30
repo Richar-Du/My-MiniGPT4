@@ -13,7 +13,7 @@ model:
   num_query_token: 32
 
   # Vicuna
-  llama_model: "/path/to/vicuna/weights/"
+  llama_model: "/home/hadoop-ba-dealrank/dolphinfs_hdd_hadoop-ba-dealrank/wanghongyu15/models/vicuna-13b-v0/"
 
   # generation configs
   prompt: ""
