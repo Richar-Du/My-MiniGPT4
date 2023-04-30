@@ -13,7 +13,7 @@ datasets:
   aokvqa: # name of the dataset builder
     vis_processor:
         eval:
-          name: "blip_image_eval"
+          name: "blip2_image_eval"
           image_size: 224
     text_processor:
         eval:
