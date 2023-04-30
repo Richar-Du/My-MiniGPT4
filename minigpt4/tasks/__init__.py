@@ -8,6 +8,7 @@
 from minigpt4.common.registry import registry
 from minigpt4.tasks.base_task import BaseTask
 from minigpt4.tasks.image_text_pretrain import ImageTextPretrainTask
+from minigpt4.tasks.vqa import AOKVQATask
 
 
 def setup_task(cfg):
@@ -23,4 +24,5 @@ def setup_task(cfg):
 __all__ = [
     "BaseTask",
     "ImageTextPretrainTask",
+    "AOKVQATask",
 ]
