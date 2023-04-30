@@ -21,7 +21,7 @@ class COCOVQABuilder(BaseDatasetBuilder):
         "eval": "configs/datasets/coco/eval_vqa.yaml",
     }
     
-@registry.register_builder("aok_vqa")
+@registry.register_builder("aokvqa")
 class AOKVQABuilder(BaseDatasetBuilder):
     train_dataset_cls = AOKVQADataset
     eval_dataset_cls = AOKVQAEvalDataset
