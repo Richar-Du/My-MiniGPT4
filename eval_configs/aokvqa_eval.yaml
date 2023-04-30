@@ -1,0 +1,44 @@
+model:
+  arch: mini_gpt4
+  model_type: pretrain_vicuna
+  freeze_vit: True
+  freeze_qformer: True
+  max_txt_len: 160
+  end_sym: "###"
+  low_resource: False
+  prompt_template: '###Human: {} ###Assistant: '
+  ckpt: '/path/to/pretrained/ckpt/'
+
+datasets:
+  aokvqa: # name of the dataset builder
+    vis_processor:
+        eval:
+          name: "blip_image_eval"
+          image_size: 224
+    text_processor:
+        eval:
+          name: "blip_question"
+#     build_info:
+#         images:
+#             storage: '/export/share/datasets/vision/coco/images/'
+
+run:
+  task: aokvqa
+  # optimizer
+  batch_size_eval: 16
+  num_workers: 4
+
+  max_new_tokens: 300
+  min_len: 8
+  num_beams: 5
+
+  seed: 42
+  output_dir: "output/minigpt4/aokvqa"
+
+  evaluate: True
+  test_splits: ["val"]
+
+  device: "cuda"
+  world_size: 1
+  dist_url: "env://"
+  distributed: True

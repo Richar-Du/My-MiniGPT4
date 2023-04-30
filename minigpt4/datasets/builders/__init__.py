@@ -12,7 +12,7 @@ from minigpt4.datasets.builders.image_text_pair_builder import (
     CCSBUAlignBuilder,
     LLaVACCSBUBuiler,
 )
-from minigpt4.datasets.builders.vqa_builder import COCOVQABuilder
+from minigpt4.datasets.builders.vqa_builder import COCOVQABuilder, AOKVQABuilder
 from minigpt4.common.registry import registry
 
 __all__ = [
@@ -20,6 +20,7 @@ __all__ = [
     "LaionBuilder",
     "CCSBUAlignBuilder",
     "COCOVQABuilder",
+    "AOKVQABuilder",
     "LLaVACCSBUBuiler"
 ]
 
