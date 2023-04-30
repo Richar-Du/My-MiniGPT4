@@ -7,7 +7,7 @@ model:
   end_sym: "###"
   low_resource: False
   prompt_template: '###Human: {} ###Assistant: '
-  ckpt: '/path/to/pretrained/ckpt/'
+  ckpt: 'ckpt/pretrained_minigpt4.pth'
 
 datasets:
   aokvqa: # name of the dataset builder
