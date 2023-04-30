@@ -156,7 +156,7 @@ class VQATask(BaseTask):
         return metrics
 
 
-@registry.register_task("aok_vqa")
+@registry.register_task("aokvqa")
 class AOKVQATask(VQATask):
     def valid_step(self, model, samples):
         answers = model.generate(
