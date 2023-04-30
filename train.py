@@ -75,9 +75,6 @@ def main():
     # allow auto-dl completes on main process without timeout when using NCCL backend.
     # os.environ["NCCL_BLOCKING_WAIT"] = "1"
 
-    # set before init_distributed_mode() to ensure the same job_id shared across all ranks.
-    job_id = now()
-
     cfg = Config(parse_args())
 
     init_distributed_mode(cfg.run_cfg)
@@ -91,12 +88,25 @@ def main():
 
     task = tasks.setup_task(cfg)
     datasets = task.build_datasets(cfg)
-    model = task.build_model(cfg)
+    if cfg.model_cfg.ckpt_dir:
+        ckpt_list = os.listdir(cfg.model_cfg.ckpt_dir)
+        for ckpt in ckpt_list:
+            # set before init_distributed_mode() to ensure the same job_id shared across all ranks.
+            job_id = now()
+            cfg.ckpt = os.path.join(cfg.model_cfg.ckpt_dir, ckpt)
+            model = task.build_model(cfg)
 
-    runner = get_runner_class(cfg)(
-        cfg=cfg, job_id=job_id, task=task, model=model, datasets=datasets
-    )
-    runner.train()
+            runner = get_runner_class(cfg)(
+                cfg=cfg, job_id=job_id, task=task, model=model, datasets=datasets
+            )
+            runner.train()
+    else:
+        job_id = now()
+        model = task.build_model(cfg)
+        runner = get_runner_class(cfg)(
+            cfg=cfg, job_id=job_id, task=task, model=model, datasets=datasets
+        )
+        runner.train()
 
 
 if __name__ == "__main__":

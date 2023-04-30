@@ -7,7 +7,7 @@ model:
   end_sym: "###"
   prompt_path: "prompts/alignment.txt"
   prompt_template: '###Human: {} ###Assistant: '
-  ckpt: '/home/hadoop-ba-dealrank/dolphinfs_hdd_hadoop-ba-dealrank/duyifan04/MiniGPT-4/ckpt/pretrained_minigpt4_stage1.pth'
+  ckpt_dir: '/home/hadoop-ba-dealrank/dolphinfs_hdd_hadoop-ba-dealrank/duyifan04/MiniGPT-4/minigpt4/output/minigpt4_stage1_pretrain/20230429151'
 
 
 datasets:
@@ -19,14 +19,14 @@ datasets:
     text_processor:
       train:
         name: "blip_caption"
-  coco_vqa:
-    vis_processor:
-      train:
-        name: "blip2_image_train"
-        image_size: 224
-    text_processor:
-      train:
-        name: "blip_caption"
+  # coco_vqa:
+  #   vis_processor:
+  #     train:
+  #       name: "blip2_image_train"
+  #       image_size: 224
+  #   text_processor:
+  #     train:
+  #       name: "blip_caption"
 
 run:
   task: image_text_pretrain
