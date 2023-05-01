@@ -94,6 +94,7 @@ def main():
     if ckpt_dir:
         ckpt_list = os.listdir(cfg.model_cfg.ckpt_dir)
         for ckpt in ckpt_list:
+            print(f"training from {ckpt}")
             new_job_id = 'stage2_' + job_id + '_stage1_' + cfg.model_cfg.ckpt_dir.split('/')[-1] + '_'
             cfg.ckpt = os.path.join(cfg.model_cfg.ckpt_dir, ckpt)
             model = task.build_model(cfg)
