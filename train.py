@@ -88,18 +88,22 @@ def main():
 
     task = tasks.setup_task(cfg)
     datasets = task.build_datasets(cfg)
-    if cfg.model_cfg.ckpt_dir:
+    ckpt_dir = cfg.model_cfg.get("ckpt_dir", None)
+    # set before init_distributed_mode() to ensure the same job_id shared across all ranks.
+    job_id = now()
+    if ckpt_dir:
         ckpt_list = os.listdir(cfg.model_cfg.ckpt_dir)
         for ckpt in ckpt_list:
-            # set before init_distributed_mode() to ensure the same job_id shared across all ranks.
-            job_id = now()
-            cfg.ckpt = os.path.join(cfg.model_cfg.ckpt_dir, ckpt)
-            model = task.build_model(cfg)
+            if '.pth' in ckpt:
+                print(f"training from {ckpt}")
+                new_job_id = 'stage2_' + job_id + '_stage1_' + cfg.model_cfg.ckpt_dir.split('/')[-1] + '_' + ckpt.split('.pth')[0]
+                cfg.ckpt = os.path.join(cfg.model_cfg.ckpt_dir, ckpt)
+                model = task.build_model(cfg)
 
-            runner = get_runner_class(cfg)(
-                cfg=cfg, job_id=job_id, task=task, model=model, datasets=datasets
-            )
-            runner.train()
+                runner = get_runner_class(cfg)(
+                    cfg=cfg, job_id=new_job_id, task=task, model=model, datasets=datasets
+                )
+                runner.train()
     else:
         job_id = now()
         model = task.build_model(cfg)

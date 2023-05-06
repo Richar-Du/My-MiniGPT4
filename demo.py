@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import gradio as gr
+import tqdm
 
 from minigpt4.common.config import Config
 from minigpt4.common.dist_utils import get_rank
@@ -24,6 +25,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Demo")
     parser.add_argument("--cfg-path", required=True, help="path to configuration file.")
     parser.add_argument("--gpu-id", type=int, default=0, help="specify the gpu to load the model.")
+    parser.add_argument("--result_file", required=True)
     parser.add_argument(
         "--options",
         nargs="+",
@@ -64,6 +66,31 @@ vis_processor = registry.get_processor_class(vis_processor_cfg.name).from_config
 chat = Chat(model, vis_processor, device='cuda:{}'.format(args.gpu_id))
 print('Initialization Finished')
 
+import json
+val_file = open('../instruct-vqa/cache/aokvqa/annotations/aokvqa_v1p0_val.json', 'r')
+output_file = open(args.result_file, 'w')
+lines = json.loads(val_file.readlines()[0])
+
+for data in tqdm.tqdm(lines):
+    question = data['question']
+    # input_text = question+f' (1) {data["choices"][0]};'+f' (2) {data["choices"][1]};'+f' (3) {data["choices"][2]};'+f' (4) {data["choices"][3]}.'
+    input_text = "Please answer the question in a short phrase: " + question
+    print(f"question = {input_text}")
+    img_path = "../instruct-vqa/cache/coco/images/"+data['image']
+    # raw_image = Image.open(img_path).convert('RGB')   
+    # display(raw_image.resize((596, 437)))
+    # image = vis_processors["eval"](raw_image).unsqueeze(0).to('cuda:0')
+    chat_state = CONV_VISION.copy()
+    img_list = []
+    chat.upload_img(img_path, chat_state, img_list)
+    chat.ask(question, chat_state)
+    llm_message = chat.answer(conv=chat_state, img_list=img_list, max_new_tokens=1000, num_beams=5, temperature=1.0)[0]
+    # print(f"mini gpt-4:{llm_message}")
+    # print(f"gt: {data['correct_choice_idx']}")
+    output_file.write(json.dumps({"image_id": data['image_id'], "question": data['question'], "prediction": llm_message, 'gt': data['direct_answers']})+'\n')
+output_file.close()
+import sys
+sys.exit()
 # ========================================
 #             Gradio Setting
 # ========================================
@@ -150,4 +177,4 @@ with gr.Blocks() as demo:
     )
     clear.click(gradio_reset, [chat_state, img_list], [chatbot, image, text_input, upload_button, chat_state, img_list], queue=False)
 
-demo.launch(share=True, enable_queue=True)
+demo.queue().launch(share=True, enable_queue=True, inbrowser=False, server_name='set-zw04-mlp-codelab-pc02.mt', server_port=8416)

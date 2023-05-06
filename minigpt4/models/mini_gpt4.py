@@ -167,49 +167,47 @@ class MiniGPT4(Blip2Base):
     def forward(self, samples):
         image = samples["image"]
         img_embeds, atts_img = self.encode_img(image)
+        if hasattr(samples, 'question_split'):  # VQA dataset
+            print('VQA Batch')
+            vqa_prompt = '###Human: <Img><ImageHere></Img> '
+            img_embeds, atts_img = self.prompt_wrap(img_embeds, atts_img, vqa_prompt)
+        elif self.prompt_list:
+            prompt = random.choice(self.prompt_list)
+            img_embeds, atts_img = self.prompt_wrap(img_embeds, atts_img, prompt)
+
         self.llama_tokenizer.padding_side = "right"
-        text = [t + self.end_sym for t in samples["text_input"]]         # text_input is the target caption
-        empty_targets = []
-        output_tokens = self.llama_tokenizer(
-            text, padding=False, truncation=True, max_length=self.max_txt_len,
-            add_special_tokens=False)             # tokens for the target caption (answer)
-        after_input_ids = []
-        after_input_attentions = []
-        for i in range(len(samples['instruction'])):
-            prompt = '###Human: <Img><ImageHere></Img> ' + samples['instruction'][i] + ' ###Assistant: '
-            # whole_sentence = prompt + text[i]
-            before, after = prompt.split('<ImageHere>')
-            before_tokens = self.llama_tokenizer(
-                before, return_tensors="pt", add_special_tokens=False).to(img_embeds.device)
-            after_tokens = self.llama_tokenizer(
-                after, return_tensors="pt", add_special_tokens=False).to(img_embeds.device)
-            empty_len = before_tokens.input_ids.size()[1] + img_embeds.size()[1]  # after的在后面算
-            empty_targets.append([-100] * (empty_len+1))  # plus one for bos
-            # after_input_ids: instructions + answer
-            after_input_ids.append(torch.tensor(after_tokens.input_ids.squeeze(0).tolist()+output_tokens.input_ids[i]))
-            after_input_attentions.append(torch.tensor(after_tokens.attention_mask.squeeze(0).tolist()+output_tokens.attention_mask[i]))
-        empty_targets = torch.tensor(empty_targets).to(img_embeds.device)
-        after_input_ids = torch.nn.utils.rnn.pad_sequence(after_input_ids, batch_first=True, padding_value=2).to(img_embeds.device)
-        after_input_attentions = torch.nn.utils.rnn.pad_sequence(after_input_attentions, batch_first=True, padding_value=0).to(img_embeds.device)
-        after_input_embeds = self.llama_model.model.embed_tokens(after_input_ids)
-        before_input_attentions = before_tokens.attention_mask.expand(after_input_attentions.size()[0], -1)
-        before_input_embeds = self.llama_model.model.embed_tokens(before_tokens.input_ids).expand(after_input_embeds.size()[0], -1, after_input_embeds.size()[-1])
-        inputs_embeds = torch.cat([before_input_embeds, img_embeds, after_input_embeds], dim=1)
-        inputs_attentions = torch.cat([before_input_attentions, atts_img, after_input_attentions], dim=1)
-        
-        targets = after_input_ids.masked_fill(
-            after_input_attentions == 0, -100
+
+        text = [t + self.end_sym for t in samples["text_input"]]
+
+        to_regress_tokens = self.llama_tokenizer(
+            text,
+            return_tensors="pt",
+            padding="longest",
+            truncation=True,
+            max_length=self.max_txt_len,
+            add_special_tokens=False
+        ).to(image.device)
+
+        targets = to_regress_tokens.input_ids.masked_fill(
+            to_regress_tokens.input_ids == self.llama_tokenizer.pad_token_id, -100
+        )
+
+        empty_targets = (
+            torch.ones([atts_img.shape[0], atts_img.shape[1]+1],
+                       dtype=torch.long).to(image.device).fill_(-100)  # plus one for bos
         )
         targets = torch.cat([empty_targets, targets], dim=1)
 
         batch_size = img_embeds.shape[0]
         bos = torch.ones([batch_size, 1],
-                         dtype=before_tokens.input_ids.dtype,
-                         device=before_tokens.input_ids.device) * self.llama_tokenizer.bos_token_id
+                         dtype=to_regress_tokens.input_ids.dtype,
+                         device=to_regress_tokens.input_ids.device) * self.llama_tokenizer.bos_token_id
         bos_embeds = self.llama_model.model.embed_tokens(bos)
         atts_bos = atts_img[:, :1]
-        inputs_embeds = torch.cat([bos_embeds, inputs_embeds], dim=1)
-        attention_mask = torch.cat([atts_bos, inputs_attentions], dim=1)
+
+        to_regress_embeds = self.llama_model.model.embed_tokens(to_regress_tokens.input_ids)
+        inputs_embeds = torch.cat([bos_embeds, img_embeds, to_regress_embeds], dim=1)
+        attention_mask = torch.cat([atts_bos, atts_img, to_regress_tokens.attention_mask], dim=1)
 
         with self.maybe_autocast():
             outputs = self.llama_model(
@@ -238,7 +236,7 @@ class MiniGPT4(Blip2Base):
         import ipdb
         ipdb.set_trace()
         for i in range(len(samples['instruction'])):
-            prompt = '###Human: <Img><ImageHere></Img> ' + samples['instruction'][i] + ' ###Assistant: '
+            prompt = 'Give the following image: <Img>ImageContent</Img>. You will be able to see the image once I provide it to you. Please answer my questions. ###Human: <Img><ImageHere></Img> ' + samples['instruction'][i] + '###Assistant: '
             before, after = prompt.split('<ImageHere>')
             before_tokens = self.llama_tokenizer(
                 before, return_tensors="pt", add_special_tokens=False).to(img_embeds.device)
@@ -254,10 +252,10 @@ class MiniGPT4(Blip2Base):
                             dtype=before_tokens.attention_mask.dtype,
                             device=before_tokens.attention_mask.device)
             before_input_embeds = self.llama_model.model.embed_tokens(before_tokens.input_ids.squeeze(0))
-            embeds = torch.cat([bos_embeds, before_input_embeds, img_embeds, after_input_embeds], dim=1)
+            embeds = torch.cat([bos_embeds, before_input_embeds.unsqueeze(0), img_embeds, after_input_embeds.unsqueeze(0)], dim=1)
             # concat_embeds.append(embeds)
             attentions = torch.cat([bos_attention, before_tokens.attention_mask, atts_img, after_tokens.attention_mask], dim=1)
-            outputs = self.model.llama_model.generate(
+            outputs = self.llama_model.generate(
                 inputs_embeds=embeds,
                 max_new_tokens=max_new_tokens,
                 stopping_criteria=stopping_criteria,
@@ -274,12 +272,14 @@ class MiniGPT4(Blip2Base):
                 output_token = output_token[1:]
             if output_token[0] == 1:  # some users find that there is a start token <s> at the beginning. remove it
                 output_token = output_token[1:]
-            output_text = self.model.llama_tokenizer.decode(output_token, add_special_tokens=False)
+            output_text = self.llama_tokenizer.decode(output_token, add_special_tokens=False)
             output_text = output_text.split('###')[0]  # remove the stop sign '###'
             output_text = output_text.split('Assistant:')[-1].strip()
+            print(f"question: {samples['instruction']}, answer: {output_text}")
             output.append(output_text)
             # concat_attentions.append(attentions)
         return output
+    
     @classmethod
     def from_config(cls, cfg):
         vit_model = cfg.get("vit_model", "eva_clip_g")
@@ -327,8 +327,7 @@ class MiniGPT4(Blip2Base):
             msg = model.load_state_dict(ckpt['model'], strict=False)
 
         return model
-
-
+    
 class StoppingCriteriaSub(StoppingCriteria):
 
     def __init__(self, stops=[], encounters=1):
