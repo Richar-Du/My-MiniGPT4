@@ -9,6 +9,7 @@ from minigpt4.common.registry import registry
 from minigpt4.models.blip2 import Blip2Base, disabled_train
 from minigpt4.models.modeling_llama import LlamaForCausalLM
 from transformers import LlamaTokenizer
+from transformers import StoppingCriteria, StoppingCriteriaList
 
 
 @registry.register_model("mini_gpt4")
@@ -219,6 +220,64 @@ class MiniGPT4(Blip2Base):
 
         return {"loss": loss}
 
+    @torch.no_grad()
+    def generate(self, samples, num_beams=3, max_length=10, min_length=1, max_new_tokens=300, top_p=0.9, repetition_penalty=1.0, length_penalty=1, temperature=1.0,):
+        stop_words_ids = [torch.tensor([835]).to(self.device),
+                          torch.tensor([2277, 29937]).to(self.device)]  # '###' can be encoded in two different ways.
+        stopping_criteria = StoppingCriteriaList([StoppingCriteriaSub(stops=stop_words_ids)])
+        image = samples["image"]
+        img_embeds, atts_img = self.encode_img(image)
+        self.llama_tokenizer.padding_side = "left"
+        after_input_ids = []
+        after_input_attentions = []
+        concat_embeds = []
+        concat_attentions = []
+        output = []
+        for i in range(len(samples['instruction'])):
+            prompt = 'Give the following image: <Img>ImageContent</Img>. You will be able to see the image once I provide it to you. Please answer my questions. ###Human: <Img><ImageHere></Img> ' + samples['instruction'][i] + '###Assistant: '
+            before, after = prompt.split('<ImageHere>')
+            before_tokens = self.llama_tokenizer(
+                before, return_tensors="pt", add_special_tokens=False).to(img_embeds.device)
+            after_tokens = self.llama_tokenizer(
+                after, return_tensors="pt", add_special_tokens=False).to(img_embeds.device)
+            after_input_ids.append(after_tokens.input_ids.squeeze(0))
+            after_input_embeds = self.llama_model.model.embed_tokens(after_tokens.input_ids.squeeze(0))
+            bos = torch.ones([1, 1],
+                         dtype=before_tokens.input_ids.dtype,
+                         device=before_tokens.input_ids.device) * self.llama_tokenizer.bos_token_id
+            bos_embeds = self.llama_model.model.embed_tokens(bos)
+            bos_attention = torch.ones([1, 1],
+                            dtype=before_tokens.attention_mask.dtype,
+                            device=before_tokens.attention_mask.device)
+            before_input_embeds = self.llama_model.model.embed_tokens(before_tokens.input_ids.squeeze(0))
+            embeds = torch.cat([bos_embeds, before_input_embeds.unsqueeze(0), img_embeds, after_input_embeds.unsqueeze(0)], dim=1)
+            # concat_embeds.append(embeds)
+            attentions = torch.cat([bos_attention, before_tokens.attention_mask, atts_img, after_tokens.attention_mask], dim=1)
+            outputs = self.llama_model.generate(
+                inputs_embeds=embeds,
+                max_new_tokens=max_new_tokens,
+                stopping_criteria=stopping_criteria,
+                num_beams=num_beams,
+                do_sample=True,
+                min_length=min_length,
+                top_p=top_p,
+                repetition_penalty=repetition_penalty,
+                length_penalty=length_penalty,
+                temperature=temperature,
+            )
+            output_token = outputs[0]
+            if output_token[0] == 0:  # the model might output a unknow token <unk> at the beginning. remove it
+                output_token = output_token[1:]
+            if output_token[0] == 1:  # some users find that there is a start token <s> at the beginning. remove it
+                output_token = output_token[1:]
+            output_text = self.llama_tokenizer.decode(output_token, add_special_tokens=False)
+            output_text = output_text.split('###')[0]  # remove the stop sign '###'
+            output_text = output_text.split('Assistant:')[-1].strip()
+            print(f"question: {samples['instruction']}, answer: {output_text}")
+            output.append(output_text)
+            # concat_attentions.append(attentions)
+        return output
+    
     @classmethod
     def from_config(cls, cfg):
         vit_model = cfg.get("vit_model", "eva_clip_g")
@@ -266,3 +325,16 @@ class MiniGPT4(Blip2Base):
             msg = model.load_state_dict(ckpt['model'], strict=False)
 
         return model
+    
+class StoppingCriteriaSub(StoppingCriteria):
+
+    def __init__(self, stops=[], encounters=1):
+        super().__init__()
+        self.stops = stops
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor):
+        for stop in self.stops:
+            if torch.all((stop == input_ids[0][-len(stop):])).item():
+                return True
+
+        return False
