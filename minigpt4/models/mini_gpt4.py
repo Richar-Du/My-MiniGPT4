@@ -235,6 +235,8 @@ class MiniGPT4(Blip2Base):
         concat_embeds = []
         concat_attentions = []
         output = []
+        import ipdb
+        ipdb.set_trace()
         for i in range(len(samples['instruction'])):
             prompt = '###Human: <Img><ImageHere></Img> ' + samples['instruction'][i] + ' ###Assistant: '
             before, after = prompt.split('<ImageHere>')
