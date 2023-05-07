@@ -10,6 +10,7 @@ from minigpt4.models.blip2 import Blip2Base, disabled_train
 from minigpt4.models.modeling_llama import LlamaForCausalLM
 from transformers import LlamaTokenizer
 from transformers import StoppingCriteria, StoppingCriteriaList
+from peft import get_peft_config, get_peft_model, LoraConfig, TaskType
 
 
 @registry.register_model("mini_gpt4")
@@ -103,6 +104,11 @@ class MiniGPT4(Blip2Base):
         for name, param in self.llama_model.named_parameters():
             param.requires_grad = False
         print('Loading LLAMA Done')
+        
+        peft_config = LoraConfig(
+            task_type=TaskType.CAUSAL_LM, inference_mode=False, r=8, lora_alpha=32, lora_dropout=0.1
+        )
+        self.llama_model = get_peft_model(self.llama_model, peft_config).model
 
         self.llama_proj = nn.Linear(
             self.Qformer.config.hidden_size, self.llama_model.config.hidden_size
@@ -202,6 +208,7 @@ class MiniGPT4(Blip2Base):
         bos = torch.ones([batch_size, 1],
                          dtype=to_regress_tokens.input_ids.dtype,
                          device=to_regress_tokens.input_ids.device) * self.llama_tokenizer.bos_token_id
+        
         bos_embeds = self.llama_model.model.embed_tokens(bos)
         atts_bos = atts_img[:, :1]
 
@@ -233,8 +240,7 @@ class MiniGPT4(Blip2Base):
         concat_embeds = []
         concat_attentions = []
         output = []
-        import ipdb
-        ipdb.set_trace()
+
         for i in range(len(samples['instruction'])):
             prompt = 'Give the following image: <Img>ImageContent</Img>. You will be able to see the image once I provide it to you. Please answer my questions. ###Human: <Img><ImageHere></Img> ' + samples['instruction'][i] + '###Assistant: '
             before, after = prompt.split('<ImageHere>')
