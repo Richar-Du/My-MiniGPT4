@@ -409,7 +409,7 @@ def convert_weights_to_fp16(model: nn.Module):
 #                 if tensor is not None:
 #                     tensor.data = tensor.data.half()
 
-    # model.apply(_convert_weights_to_fp16)
+    model.apply(_convert_weights_to_fp16)
     
     
 def create_eva_vit_g(img_size=224,drop_path_rate=0.4,use_checkpoint=False,precision="fp16"):
