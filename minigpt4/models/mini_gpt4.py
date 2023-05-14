@@ -41,6 +41,7 @@ class MiniGPT4(Blip2Base):
         end_sym='\n',
         low_resource=False,  # use 8 bit and put vit in cpu
         device_8bit=0,  # the device of 8bit model should be set when loading and cannot be changed anymore.
+        lora=False
     ):
         super().__init__()
 
@@ -105,10 +106,12 @@ class MiniGPT4(Blip2Base):
             param.requires_grad = False
         print('Loading LLAMA Done')
         
-        peft_config = LoraConfig(
-            task_type=TaskType.CAUSAL_LM, inference_mode=False, r=8, lora_alpha=32, lora_dropout=0.1
-        )
-        self.llama_model = get_peft_model(self.llama_model, peft_config).model
+        if lora:
+            print(f"Fine tuning with LoRA")
+            peft_config = LoraConfig(
+                task_type=TaskType.CAUSAL_LM, inference_mode=False, r=8, lora_alpha=32, lora_dropout=0.1
+            )
+            self.llama_model = get_peft_model(self.llama_model, peft_config).model
 
         self.llama_proj = nn.Linear(
             self.Qformer.config.hidden_size, self.llama_model.config.hidden_size
@@ -258,9 +261,9 @@ class MiniGPT4(Blip2Base):
                             dtype=before_tokens.attention_mask.dtype,
                             device=before_tokens.attention_mask.device)
             before_input_embeds = self.llama_model.model.embed_tokens(before_tokens.input_ids.squeeze(0))
-            embeds = torch.cat([bos_embeds, before_input_embeds.unsqueeze(0), img_embeds, after_input_embeds.unsqueeze(0)], dim=1)
+            embeds = torch.cat([bos_embeds, before_input_embeds.unsqueeze(0), img_embeds[i].unsqueeze(0), after_input_embeds.unsqueeze(0)], dim=1)
             # concat_embeds.append(embeds)
-            attentions = torch.cat([bos_attention, before_tokens.attention_mask, atts_img, after_tokens.attention_mask], dim=1)
+            attentions = torch.cat([bos_attention, before_tokens.attention_mask, atts_img[i].unsqueeze(0), after_tokens.attention_mask], dim=1)
             outputs = self.llama_model.generate(
                 inputs_embeds=embeds,
                 max_new_tokens=max_new_tokens,
@@ -281,7 +284,7 @@ class MiniGPT4(Blip2Base):
             output_text = self.llama_tokenizer.decode(output_token, add_special_tokens=False)
             output_text = output_text.split('###')[0]  # remove the stop sign '###'
             output_text = output_text.split('Assistant:')[-1].strip()
-            print(f"question: {samples['instruction']}, answer: {output_text}")
+            # print(f"question: {samples['instruction']}, answer: {output_text}")
             output.append(output_text)
             # concat_attentions.append(attentions)
         return output
@@ -299,6 +302,7 @@ class MiniGPT4(Blip2Base):
         vit_precision = cfg.get("vit_precision", "fp16")
         freeze_vit = cfg.get("freeze_vit", True)
         freeze_qformer = cfg.get("freeze_qformer", True)
+        lora = cfg.get("lora", False)
         low_resource = cfg.get("low_resource", False)
         device_8bit = cfg.get("device_8bit", 0)
 
@@ -324,6 +328,7 @@ class MiniGPT4(Blip2Base):
             end_sym=end_sym,
             low_resource=low_resource,
             device_8bit=device_8bit,
+            lora=lora,
         )
 
         ckpt_path = cfg.get("ckpt", "")  # load weights of MiniGPT-4
@@ -331,6 +336,8 @@ class MiniGPT4(Blip2Base):
             print("Load BLIP2-LLM Checkpoint: {}".format(ckpt_path))
             ckpt = torch.load(ckpt_path, map_location="cpu")
             msg = model.load_state_dict(ckpt['model'], strict=False)
+        else:
+            print("train from scratch!!!")
 
         return model
     

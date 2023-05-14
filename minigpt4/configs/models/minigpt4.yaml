@@ -14,6 +14,7 @@ model:
 
   # Vicuna
   llama_model: "/home/hadoop-ba-dealrank/dolphinfs_hdd_hadoop-ba-dealrank/wanghongyu15/models/vicuna-13b-v0/"
+  lora: True
 
   # generation configs
   prompt: ""
