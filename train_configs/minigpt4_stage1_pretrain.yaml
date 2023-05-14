@@ -3,6 +3,7 @@ model:
   model_type: pretrain_vicuna
   freeze_vit: True
   freeze_qformer: True
+  LoRA: True
 
 
 datasets:
@@ -44,11 +45,12 @@ run:
 
   weight_decay: 0.05
   max_epoch: 1
-  batch_size_train: 64
+  batch_size_train: 32
   batch_size_eval: 64
   num_workers: 4
   warmup_steps: 5000
-  # iters_per_epoch: 5000
+  iters_per_epoch: 20000
+  clip_gradient: 1
 
   seed: 42
   output_dir: "output/minigpt4_stage1_pretrain"

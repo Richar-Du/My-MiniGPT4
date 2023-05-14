@@ -230,6 +230,10 @@ class BaseTask:
             else:
                 loss.backward()
 
+            clip_gradient = config.run_cfg.get('clip_gradient', None)
+            if clip_gradient:
+                torch.nn.utils.clip_grad_norm_(parameters=model.parameters(), max_norm=clip_gradient, norm_type=2)
+                
             # update gradients every accum_grad_iters iterations
             if (i + 1) % accum_grad_iters == 0:
                 if use_amp:
@@ -242,7 +246,7 @@ class BaseTask:
             metric_logger.update(loss=loss.item())
             metric_logger.update(lr=optimizer.param_groups[0]["lr"])
             
-            if (i + 1) % (log_freq * 2) == 0:
+            if (i + 1) % (log_freq * 40) == 0:
                 self._save_checkpoint(model, optimizer, scaler, config, output_dir, epoch, i)
 
         # after train_epoch()
