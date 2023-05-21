@@ -97,7 +97,7 @@ def main():
             if '.pth' in ckpt:
                 print(f"training from {ckpt}")
                 new_job_id = 'stage2_' + job_id + '_stage1_' + cfg.model_cfg.ckpt_dir.split('/')[-1] + '_' + ckpt.split('.pth')[0]
-                cfg.ckpt = os.path.join(cfg.model_cfg.ckpt_dir, ckpt)
+                cfg.model_cfg.ckpt = os.path.join(cfg.model_cfg.ckpt_dir, ckpt)
                 model = task.build_model(cfg)
 
                 runner = get_runner_class(cfg)(
